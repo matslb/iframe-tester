@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>localStorage Sandbox Test</title>
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .header {
+      padding: 20px;
+      background-color: #f0f0f0;
+      border-bottom: 2px solid #ccc;
+    }
+
+    .info {
+      padding: 10px 20px;
+      background-color: #fff3cd;
+      border-bottom: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    .iframe-container {
+      flex: 1;
+      position: relative;
+      border: 2px solid #333;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    .controls {
+      padding: 10px 20px;
+      background-color: #f0f0f0;
+      border-top: 1px solid #ccc;
+    }
+
+    button {
+      margin-right: 10px;
+      padding: 8px 16px;
+      cursor: pointer;
+    }
+
+    .url-input-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .url-input-container input {
+      flex: 1;
+      padding: 8px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    .url-input-container button {
+      padding: 8px 16px;
+    }
+
+    .error-panel {
+      background-color: #fee;
+      border: 2px solid #f00;
+      border-radius: 4px;
+      padding: 15px;
+      margin: 10px 20px;
+      max-height: 300px;
+      overflow-y: auto;
+      display: none;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    .error-panel.visible {
+      display: block;
+    }
+
+    .error-panel h3 {
+      margin-top: 0;
+      color: #c00;
+    }
+
+    .error-details {
+      background-color: #fff;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .error-meta {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #666;
+    }
+
+    .clear-errors-btn {
+      margin-top: 10px;
+      padding: 5px 10px;
+      background-color: #f00;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>localStorage Sandbox Test</h1>
+      <p>This page loads your landing page in a sandboxed iframe with only <code>allow-scripts</code> permission.</p>
+      <p><strong>Expected:</strong> localStorage access should be denied, simulating a sandboxed environment.</p>
+    </div>
+
+    <div class="info">
+      <strong>Sandbox attributes:</strong> <span id="sandbox-status"><code>allow-scripts</code> (enabled)</span><br>
+      <strong>Current URL:</strong> <span id="iframe-url">Not set</span>
+    </div>
+
+    <div id="error-panel" class="error-panel">
+      <h3>⚠️ Caught Exceptions</h3>
+      <div id="error-content"></div>
+      <button class="clear-errors-btn" onclick="clearErrors()">Clear Errors</button>
+    </div>
+
+    <div class="iframe-container">
+      <iframe id="test-iframe" src="" sandbox="allow-scripts" title="Sandboxed Landing Page"></iframe>
+    </div>
+
+    <div class="controls">
+      <div class="url-input-container">
+        <label for="url-input"><strong>Test URL:</strong></label>
+        <input type="text" id="url-input" placeholder="http://localhost:3000" />
+        <button onclick="loadUrl()">Load URL</button>
+      </div>
+      <div>
+        <button onclick="toggleSandbox()" id="sandbox-toggle">Disable Sandbox</button>
+        <button onclick="reloadIframe()">Reload Iframe</button>
+        <button onclick="openInNewTab()">Open in New Tab</button>
+        <span id="status"></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const iframe = document.getElementById('test-iframe');
+    const statusEl = document.getElementById('status');
+    const urlEl = document.getElementById('iframe-url');
+    const urlInput = document.getElementById('url-input');
+    const sandboxStatusEl = document.getElementById('sandbox-status');
+    const sandboxToggleBtn = document.getElementById('sandbox-toggle');
+    const errorPanel = document.getElementById('error-panel');
+    const errorContent = document.getElementById('error-content');
+    let sandboxEnabled = true;
+    let errorCount = 0;
+
+    // Update URL from query param if provided
+    const urlParams = new URLSearchParams(window.location.search);
+    const testUrl = urlParams.get('url');
+    if (testUrl) {
+      urlInput.value = testUrl;
+      loadUrl(testUrl);
+    } else {
+      // Set default to localhost:3000
+      urlInput.value = 'http://localhost:3000';
+    }
+
+    function loadUrl(url) {
+      const urlToLoad = url || urlInput.value.trim();
+      if (!urlToLoad) {
+        statusEl.textContent = '❌ Please enter a URL';
+        statusEl.style.color = 'red';
+        return;
+      }
+
+      try {
+        // Validate URL
+        new URL(urlToLoad);
+        iframe.src = urlToLoad;
+        urlEl.textContent = urlToLoad;
+        statusEl.textContent = 'Loading...';
+        statusEl.style.color = 'blue';
+      } catch (e) {
+        statusEl.textContent = '❌ Invalid URL: ' + e.message;
+        statusEl.style.color = 'red';
+      }
+    }
+
+    // Allow Enter key to load URL
+    urlInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        loadUrl();
+      }
+    });
+
+    function updateSandboxStatus() {
+      if (sandboxEnabled) {
+        iframe.setAttribute('sandbox', 'allow-scripts');
+        sandboxStatusEl.innerHTML = '<code>allow-scripts</code> (enabled)';
+        sandboxToggleBtn.textContent = 'Disable Sandbox';
+      } else {
+        iframe.removeAttribute('sandbox');
+        sandboxStatusEl.innerHTML = '<code>none</code> (disabled)';
+        sandboxToggleBtn.textContent = 'Enable Sandbox';
+      }
+    }
+
+    function toggleSandbox() {
+      sandboxEnabled = !sandboxEnabled;
+      updateSandboxStatus();
+      reloadIframe();
+    }
+
+    function reloadIframe() {
+      statusEl.textContent = 'Reloading...';
+      iframe.src = iframe.src; // Force reload
+      setTimeout(() => {
+        statusEl.textContent = 'Reloaded';
+        setTimeout(() => statusEl.textContent = '', 2000);
+      }, 500);
+    }
+
+    function openInNewTab() {
+      window.open(iframe.src, '_blank');
+    }
+
+    // Log iframe errors
+    iframe.addEventListener('load', () => {
+      console.log('Iframe loaded:', iframe.src);
+      // Try to check for errors in iframe console (limited due to cross-origin)
+      try {
+        const iframeWindow = iframe.contentWindow;
+        console.log('Iframe window accessible:', !!iframeWindow);
+      } catch (e) {
+        console.log('Cross-origin restriction (expected):', e.message);
+      }
+    });
+
+    iframe.addEventListener('error', (e) => {
+      console.error('Iframe error:', e);
+      statusEl.textContent = '❌ Iframe failed to load';
+      statusEl.style.color = 'red';
+      displayError('Iframe Load Error', 'The iframe failed to load', e, 'iframe');
+    });
+
+    // Global error handlers
+    window.onerror = function (message, source, lineno, colno, error) {
+      const errorInfo = {
+        message: message,
+        source: source,
+        line: lineno,
+        column: colno,
+        error: error,
+        stack: error ? error.stack : null,
+        timestamp: new Date().toISOString()
+      };
+
+      displayError(
+        'Uncaught Exception',
+        message,
+        error,
+        'window.onerror',
+        errorInfo
+      );
+
+      // Don't prevent default error handling
+      return false;
+    };
+
+    // Catch unhandled promise rejections
+    window.addEventListener('unhandledrejection', function (event) {
+      const error = event.reason;
+      displayError(
+        'Unhandled Promise Rejection',
+        error?.message || String(error),
+        error,
+        'unhandledrejection',
+        {
+          reason: error,
+          stack: error?.stack,
+          timestamp: new Date().toISOString()
+        }
+      );
+    });
+
+    function displayError(title, message, error, source, details = {}) {
+      errorCount++;
+      errorPanel.classList.add('visible');
+
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'error-details';
+
+      const errorInfo = {
+        title: title,
+        message: message,
+        source: source,
+        errorType: error?.constructor?.name || typeof error,
+        errorName: error?.name,
+        errorMessage: error?.message,
+        stack: error?.stack || details.stack,
+        ...details
+      };
+
+      let errorText = `[${errorCount}] ${title}\n`;
+      errorText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+      errorText += `Source: ${source}\n`;
+      errorText += `Message: ${message}\n\n`;
+
+      if (error?.name) {
+        errorText += `Error Name: ${error.name}\n`;
+      }
+
+      if (error?.message) {
+        errorText += `Error Message: ${error.message}\n`;
+      }
+
+      if (error?.constructor?.name) {
+        errorText += `Error Type: ${error.constructor.name}\n`;
+      }
+
+      if (details.source) {
+        errorText += `File: ${details.source}\n`;
+      }
+
+      if (details.line !== undefined) {
+        errorText += `Line: ${details.line}\n`;
+      }
+
+      if (details.column !== undefined) {
+        errorText += `Column: ${details.column}\n`;
+      }
+
+      if (error?.stack || details.stack) {
+        errorText += `\nStack Trace:\n${error?.stack || details.stack}\n`;
+      }
+
+      if (details.timestamp) {
+        errorText += `\nTimestamp: ${details.timestamp}\n`;
+      }
+
+      // Try to identify the cause
+      let cause = 'Unknown';
+      if (message && message.includes('localStorage')) {
+        cause = 'localStorage access attempt';
+      } else if (message && message.includes('Access is denied')) {
+        cause = 'Sandbox restriction - Access denied';
+      } else if (error?.name === 'DOMException') {
+        cause = 'DOM Exception - likely due to sandbox restrictions';
+      } else if (error?.name === 'SecurityError') {
+        cause = 'Security Error - Cross-origin or sandbox restriction';
+      } else if (error?.name === 'TypeError') {
+        cause = 'Type Error - Invalid operation or undefined property';
+      } else if (error?.name === 'ReferenceError') {
+        cause = 'Reference Error - Undefined variable or property';
+      }
+
+      errorText += `\nLikely Cause: ${cause}\n`;
+
+      errorDiv.textContent = errorText;
+      errorContent.appendChild(errorDiv);
+
+      // Scroll to bottom
+      errorPanel.scrollTop = errorPanel.scrollHeight;
+
+      // Also log to console
+      console.error(`[Error #${errorCount}] ${title}:`, errorInfo);
+    }
+
+    function clearErrors() {
+      errorContent.innerHTML = '';
+      errorCount = 0;
+      errorPanel.classList.remove('visible');
+    }
+
+    // Listen for error messages from iframe
+    window.addEventListener('message', function (event) {
+      if (event.data && event.data.type === 'iframe-error') {
+        displayError(
+          'Iframe Error (from iframe)',
+          event.data.error.message,
+          event.data.error,
+          'iframe-internal',
+          event.data.error
+        );
+      } else if (event.data && event.data.type === 'iframe-rejection') {
+        displayError(
+          'Iframe Promise Rejection (from iframe)',
+          event.data.error.message,
+          event.data.error,
+          'iframe-internal',
+          event.data.error
+        );
+      }
+    });
+  </script>
+</body>
+
+</html>

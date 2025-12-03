@@ -121,20 +121,52 @@
       border-radius: 4px;
       cursor: pointer;
     }
+
+    .config-selector-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .config-selector-container label {
+      font-weight: bold;
+    }
+
+    .config-selector-container select {
+      flex: 1;
+      padding: 8px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: white;
+      cursor: pointer;
+    }
+
+    .config-description {
+      margin-top: 5px;
+      padding: 8px;
+      background-color: #e8f4f8;
+      border-left: 3px solid #2196F3;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #333;
+      font-style: italic;
+    }
   </style>
 </head>
 
 <body>
   <div class="container">
     <div class="header">
-      <h1>localStorage Sandbox Test</h1>
-      <p>This page loads your landing page in a sandboxed iframe with only <code>allow-scripts</code> permission.</p>
-      <p><strong>Expected:</strong> localStorage access should be denied, simulating a sandboxed environment.</p>
+      <h1>Iframe Sandbox Configuration Test</h1>
+      <p>This page loads your landing page in an iframe with different sandbox configurations to test how various restrictions affect the payment flow.</p>
     </div>
 
     <div class="info">
-      <strong>Sandbox attributes:</strong> <span id="sandbox-status"><code>allow-scripts</code> (enabled)</span><br>
-      <strong>Current URL:</strong> <span id="iframe-url">Not set</span>
+      <strong>Sandbox attributes:</strong> <span id="sandbox-status"><code>allow-scripts</code></span><br>
+      <strong>Current URL:</strong> <span id="iframe-url">Not set</span><br>
+      <div id="config-description" class="config-description">Allows JavaScript execution but blocks localStorage/sessionStorage. Simulates strict security policies or CSP restrictions.</div>
     </div>
 
     <div id="error-panel" class="error-panel">
@@ -144,7 +176,7 @@
     </div>
 
     <div class="iframe-container">
-      <iframe id="test-iframe" src="" sandbox="allow-scripts" allow-same-origin title="Sandboxed Landing Page"></iframe>
+      <iframe id="test-iframe" src="" sandbox="allow-scripts" title="Sandboxed Landing Page"></iframe>
     </div>
 
     <div class="controls">
@@ -153,8 +185,25 @@
         <input type="text" id="url-input" placeholder="http://localhost:3000" />
         <button onclick="loadUrl()">Load URL</button>
       </div>
+      <div class="config-selector-container">
+        <label for="sandbox-config"><strong>Iframe Configuration:</strong></label>
+        <select id="sandbox-config" onchange="changeSandboxConfig()">
+          <option value="none">No Sandbox (Full Access)</option>
+          <option value="allow-scripts" selected>allow-scripts</option>
+          <option value="allow-scripts allow-same-origin">allow-scripts allow-same-origin</option>
+          <option value="allow-scripts allow-forms">allow-scripts allow-forms</option>
+          <option value="allow-scripts allow-same-origin allow-forms">allow-scripts allow-same-origin allow-forms</option>
+          <option value="allow-scripts allow-popups">allow-scripts allow-popups</option>
+          <option value="allow-scripts allow-same-origin allow-popups">allow-scripts allow-same-origin allow-popups</option>
+          <option value="allow-scripts allow-same-origin allow-forms allow-popups">allow-scripts allow-same-origin allow-forms allow-popups</option>
+          <option value="allow-scripts allow-top-navigation">allow-scripts allow-top-navigation</option>
+          <option value="allow-scripts allow-same-origin allow-top-navigation">allow-scripts allow-same-origin allow-top-navigation</option>
+          <option value="allow-scripts allow-same-origin allow-forms allow-top-navigation">allow-scripts allow-same-origin allow-forms allow-top-navigation</option>
+          <option value="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation">allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation</option>
+          <option value="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-top-navigation">allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-top-navigation</option>
+        </select>
+      </div>
       <div>
-        <button onclick="toggleSandbox()" id="sandbox-toggle">Disable Sandbox</button>
         <button onclick="reloadIframe()">Reload Iframe</button>
         <button onclick="openInNewTab()">Open in New Tab</button>
         <span id="status"></span>
@@ -168,21 +217,74 @@
     const urlEl = document.getElementById('iframe-url');
     const urlInput = document.getElementById('url-input');
     const sandboxStatusEl = document.getElementById('sandbox-status');
-    const sandboxToggleBtn = document.getElementById('sandbox-toggle');
+    const sandboxConfigSelect = document.getElementById('sandbox-config');
+    const configDescriptionEl = document.getElementById('config-description');
     const errorPanel = document.getElementById('error-panel');
     const errorContent = document.getElementById('error-content');
-    let sandboxEnabled = true;
     let errorCount = 0;
 
-    // Update URL from query param if provided
+    // Define sandbox configurations with descriptions
+    const sandboxConfigs = {
+      'none': {
+        description: 'Normal iframe with full access. Simulates standard embedding scenarios without any restrictions.'
+      },
+      'allow-scripts': {
+        description: 'Allows JavaScript execution but blocks localStorage/sessionStorage. Simulates strict security policies or CSP restrictions.'
+      },
+      'allow-scripts allow-same-origin': {
+        description: 'Allows scripts and same-origin access, enabling localStorage. Simulates same-origin embedding scenarios.'
+      },
+      'allow-scripts allow-forms': {
+        description: 'Allows scripts and form submission. Simulates scenarios where forms work but storage may be blocked.'
+      },
+      'allow-scripts allow-same-origin allow-forms': {
+        description: 'Common configuration allowing scripts, same-origin access, and forms. Simulates typical payment widget embedding.'
+      },
+      'allow-scripts allow-popups': {
+        description: 'Allows scripts and popups. Simulates scenarios where popup windows are needed (e.g., OAuth flows) but storage is blocked.'
+      },
+      'allow-scripts allow-same-origin allow-popups': {
+        description: 'Allows scripts, same-origin access, and popups. Simulates OAuth/popup-based payment flows with storage access.'
+      },
+      'allow-scripts allow-same-origin allow-forms allow-popups': {
+        description: 'Very permissive configuration. Simulates trusted embedding scenarios with full functionality including storage, forms, and popups.'
+      },
+      'allow-scripts allow-top-navigation': {
+        description: 'Allows scripts and top-level navigation. Simulates payment redirects after completion but blocks storage access.'
+      },
+      'allow-scripts allow-same-origin allow-top-navigation': {
+        description: 'Allows scripts, same-origin access, and top-level navigation. Simulates payment redirects with storage access.'
+      },
+      'allow-scripts allow-same-origin allow-forms allow-top-navigation': {
+        description: 'Allows scripts, same-origin, forms, and top-level navigation. Simulates payment flows with form submission and redirects.'
+      },
+      'allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation': {
+        description: 'Allows scripts, same-origin, forms, popups, and top-level navigation. Simulates payment flows with OAuth and redirects.'
+      },
+      'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-top-navigation': {
+        description: 'Maximum permissive configuration. Simulates fully-featured payment embedding with all interaction methods enabled.'
+      }
+    };
+
+    // Update URL and config from query params if provided
     const urlParams = new URLSearchParams(window.location.search);
     const testUrl = urlParams.get('url');
+    const testConfig = urlParams.get('config');
+    
     if (testUrl) {
       urlInput.value = testUrl;
       loadUrl(testUrl);
     } else {
       // Set default to localhost:3000
       urlInput.value = 'http://localhost:3000';
+    }
+
+    if (testConfig && sandboxConfigs[testConfig]) {
+      sandboxConfigSelect.value = testConfig;
+      changeSandboxConfig();
+    } else {
+      // Set default configuration
+      changeSandboxConfig();
     }
 
     function loadUrl(url) {
@@ -213,22 +315,28 @@
       }
     });
 
-    function updateSandboxStatus() {
-      if (sandboxEnabled) {
-        iframe.setAttribute('sandbox', 'allow-scripts');
-        sandboxStatusEl.innerHTML = '<code>allow-scripts</code> (enabled)';
-        sandboxToggleBtn.textContent = 'Disable Sandbox';
-      } else {
+    function changeSandboxConfig() {
+      const selectedConfig = sandboxConfigSelect.value;
+      const config = sandboxConfigs[selectedConfig];
+      
+      if (selectedConfig === 'none') {
         iframe.removeAttribute('sandbox');
-        sandboxStatusEl.innerHTML = '<code>none</code> (disabled)';
-        sandboxToggleBtn.textContent = 'Enable Sandbox';
+        sandboxStatusEl.innerHTML = '<code>none</code> (no sandbox)';
+      } else {
+        iframe.setAttribute('sandbox', selectedConfig);
+        sandboxStatusEl.innerHTML = `<code>${selectedConfig}</code>`;
       }
-    }
-
-    function toggleSandbox() {
-      sandboxEnabled = !sandboxEnabled;
-      updateSandboxStatus();
-      reloadIframe();
+      
+      // Update description
+      if (config && config.description) {
+        configDescriptionEl.textContent = config.description;
+      }
+      
+      // Reload iframe to apply new configuration only if a valid URL is already loaded
+      const currentSrc = iframe.src;
+      if (currentSrc && currentSrc !== window.location.href && currentSrc !== 'about:blank') {
+        reloadIframe();
+      }
     }
 
     function reloadIframe() {

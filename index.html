@@ -128,12 +128,12 @@
   <div class="container">
     <div class="header">
       <h1>localStorage Sandbox Test</h1>
-      <p>This page loads your landing page in a sandboxed iframe with <code>allow-scripts allow-same-origin</code> permissions.</p>
-      <p><strong>Note:</strong> With <code>allow-same-origin</code>, localStorage access is allowed (needed to avoid CORS errors). To test blocked localStorage, remove <code>allow-same-origin</code>.</p>
+      <p>This page loads your landing page in a sandboxed iframe with only <code>allow-scripts</code> permission.</p>
+      <p><strong>Expected:</strong> localStorage access should be denied, simulating a sandboxed environment.</p>
     </div>
 
     <div class="info">
-      <strong>Sandbox attributes:</strong> <span id="sandbox-status"><code>allow-scripts allow-same-origin</code> (enabled)</span><br>
+      <strong>Sandbox attributes:</strong> <span id="sandbox-status"><code>allow-scripts</code> (enabled)</span><br>
       <strong>Current URL:</strong> <span id="iframe-url">Not set</span>
     </div>
 
@@ -144,7 +144,7 @@
     </div>
 
     <div class="iframe-container">
-      <iframe id="test-iframe" src="" sandbox="allow-scripts allow-same-origin" title="Sandboxed Landing Page"></iframe>
+      <iframe id="test-iframe" src="" sandbox="allow-scripts" allow-same-origin title="Sandboxed Landing Page"></iframe>
     </div>
 
     <div class="controls">
@@ -215,8 +215,8 @@
 
     function updateSandboxStatus() {
       if (sandboxEnabled) {
-        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
-        sandboxStatusEl.innerHTML = '<code>allow-scripts allow-same-origin</code> (enabled)';
+        iframe.setAttribute('sandbox', 'allow-scripts');
+        sandboxStatusEl.innerHTML = '<code>allow-scripts</code> (enabled)';
         sandboxToggleBtn.textContent = 'Disable Sandbox';
       } else {
         iframe.removeAttribute('sandbox');
